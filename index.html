@@ -106,9 +106,9 @@ label.btn,.btn.hold{-webkit-tap-highlight-color:transparent;user-select:none;-we
 .btn.speak.rec{flex-basis:140px;width:140px;height:140px;background:var(--bad);color:#fff;box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 22%,transparent)}
 .vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
 .vres{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--soft);border-radius:18px;padding:14px}
-.vstars{font-size:2.6rem}
+.vstars{font-size:2.3rem;letter-spacing:.06em;color:var(--sun);margin:0}
 .vmsg{font-weight:800;text-align:center}
-.rate{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}.rate.two{grid-template-columns:repeat(2,1fr)}
+.rate{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}.rate.two{grid-template-columns:repeat(2,1fr)}.rate.five{grid-template-columns:repeat(5,1fr);gap:6px}.rate.five .btn{padding:6px 2px;font-size:.95rem}
 .vres.ok{background:color-mix(in srgb,var(--ok) 14%,var(--soft))}.vres.wrong{background:color-mix(in srgb,var(--bad) 12%,var(--soft))}.vres.near{background:color-mix(in srgb,var(--sun) 16%,var(--soft))}
 .vres.wrong .vmsg{color:var(--bad)}.vres.ok .vmsg{color:var(--ok)}
 .rate .btn{min-height:52px;padding:8px;font-size:1rem}
@@ -171,7 +171,7 @@ const LES=[];TOPICS.forEach((t,ti)=>{t.idx=ti;t.lessons=[];
   const r={id:`${t.k}-r`,t,title:"Review",review:true,words:t.lessons.flatMap(l=>l.words)};t.lessons.push(r);LES.push(r);});
 const BYID=Object.fromEntries(LES.map(l=>[l.id,l]));
 const ICON={people:"EK_FAM_FAMILY",colors:"EK_COL_PURPLE",numbers:"EK_DIG_03_THREE",abc:"EK_ABC_A_APPLE",places:"EK_PLA_SCHOOL",home:"EK_HOM_BED"};
-const APP_VERSION="Phiên bản 10 · 12/11/2026 · bộ hình dự án";
+const APP_VERSION="Phiên bản 11 · 12/11/2026";
 const AVATARS=["🐅","🐼","🦊","🐇","🦁","🐒"];
 
 /* ---- Tiến độ lưu trên máy ---- */
@@ -421,107 +421,152 @@ function gradeVoice(a,expect){
   if(a.peak<.05)return{lv:1,msg:"Con đã nói rồi, nhưng hơi nhỏ. Lần sau nói to hơn chút nhé!"};
   if(Math.abs(a.syl-expect)<=1&&a.voiced<expect*.9+3)return{lv:3,msg:"Con nói to, rõ, đủ tiếng. Giỏi lắm!"};
   return{lv:2,msg:"Con nói to rồi! Thử nói chậm và rõ từng tiếng như cô nhé."};}
-function saveSpeak(w,auto,rate){S.speak=S.speak||{};const r=S.speak[w.en]||{tries:0,best:0,rate:null,wrong:0,topic:R.l.t.k};
-  if(auto!=null){r.tries++;r.best=Math.max(r.best,auto);r.last=auto;}
-  if(rate==="auto-wrong"||rate==="again")r.wrong=(r.wrong||0)+1;
-  if(rate)r.rate=rate==="auto-ok"?"ok":rate==="auto-wrong"?(r.rate==="ok"?"ok":"again"):rate;r.topic=R.l.t.k;S.speak[w.en]=r;save();}
+function saveSpeak(w,stars,rate){S.speak=S.speak||{};const r=S.speak[w.en]||{tries:0,best:0,rate:null,wrong:0,topic:R.l.t.k};
+  if(r.scale!==5){r.best=Math.round((r.best||0)*5/3);r.scale=5;} // dữ liệu cũ chấm thang 3 sao
+  if(stars!=null){r.tries++;r.best=Math.max(r.best,stars);r.last=stars;if(stars<=2)r.wrong=(r.wrong||0)+1;}
+  if(rate)r.rate=rate;else if(stars!=null)r.rate=stars>=4?"ok":stars===3?(r.rate==="ok"?"ok":"near"):(r.rate==="ok"?"ok":"again");
+  r.topic=R.l.t.k;S.speak[w.en]=r;save();}
 
-/* ---- Micro trực tiếp: GIỮ ĐỂ NÓI, NHẢ RA LÀ XONG ----
-   Chạy được khi trang được phép dùng micro (trang web riêng mở bằng Chrome/Safari, hoặc app thật).
-   Trên Artifact micro bị chặn → app tự chuyển về cách ghi âm bằng trình ghi âm của máy. */
-const MIC={state:"unknown",stream:null};let SR_STATE="on";
+/* ---- Micro: có 3 đường, app tự chọn đường chạy được trên máy ----
+   1. Trang web riêng / app thật (Chrome, Safari trên điện thoại): mở micro trực tiếp + nhận dạng giọng nói của trình duyệt.
+   2. Trong Claude (Artifact) trên Chrome: micro do Claude giữ, app nhận lại chữ bé nói (dictation).
+   3. Không có hai đường trên: ghi âm bằng trình ghi âm của máy, bố mẹ chấm. */
+const MIC={state:"unknown",stream:null};let SR_STATE="on",DICT=null;
+try{if(window.claude&&window.claude.use)window.claude.use("dictation").then(d=>{DICT=d||null;}).catch(()=>{});}catch(e){}
 async function getMic(){if(MIC.state==="blocked")return null;if(MIC.stream&&MIC.stream.active)return MIC.stream;
   try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder)throw 0;
-    MIC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});MIC.state="ok";return MIC.stream;}
+    MIC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});MIC.state="ok";return MIC.stream;}
   catch(e){MIC.state="blocked";return null;}}
 function releaseMic(){try{MIC.stream&&MIC.stream.getTracks().forEach(t=>t.stop());}catch(e){}MIC.stream=null;}
 const NW="zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split(" ");
 const numWord=n=>n<=20?NW[n]:n<100?["","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"][Math.floor(n/10)]+(n%10?" "+NW[n%10]:""):String(n);
 const toks=s=>s.toLowerCase().replace(/\d+/g,m=>" "+numWord(+m)+" ").replace(/[-–]/g," ").replace(/[^a-z ]/g," ").split(/\s+/).filter(Boolean);
 function keyToks(w){const base=w.en.includes(" – ")?w.en.split(" – ")[1]:w.en;return toks(base).filter(x=>!["a","an","the"].includes(x));}
-function heardMatch(w,alts){const key=keyToks(w);return alts.find(a=>{const tk=toks(a);return key.every(k=>tk.some(x=>x===k||x===k+"s"||x+"s"===k||x===k+"es"));})||null;}
+const tokEq=(x,k)=>x===k||x===k+"s"||x+"s"===k||x===k+"es"||x+"es"===k;
+function heardMatch(w,alts){const key=keyToks(w);return alts.find(a=>{const tk=toks(a);return key.every(k=>tk.some(x=>tokEq(x,k)));})||null;}
+function heardPart(w,alts){const key=keyToks(w);if(key.length<2)return null;return alts.find(a=>{const tk=toks(a);return key.filter(k=>tk.some(x=>tokEq(x,k))).length*2>=key.length;})||null;}
+
+/* CHẤM 1–5 SAO
+   5★ máy nghe đúng từ, rõ ràng (độ tin cậy cao hoặc đủ to, đủ tiếng)     → khen, đi tiếp
+   4★ máy nghe đúng từ nhưng chưa thật rõ                                  → khen, đi tiếp
+   3★ gần đúng (đúng ở phương án nghe thứ hai, hoặc đúng một phần từ ghép) → nên đọc lại, được đi tiếp
+   2★ con có nói nhưng máy nghe ra từ khác / chưa rõ từ                     → phải đọc lại
+   1★ không nghe thấy tiếng, hoặc nói quá nhỏ                               → phải đọc lại */
+const STAR_MSG={5:"Tuyệt vời! Con đọc rất chuẩn.",4:"Giỏi lắm! Con đọc đúng rồi.",3:"Gần đúng rồi! Con nghe cô và đọc lại rõ hơn nhé.",2:"Chưa đúng. Con nghe cô đọc rồi đọc lại nhé!",1:"Cô chưa nghe thấy con. Con nói to hơn nhé!"};
+const STAR_SAY={5:"Excellent!",4:"Very good!",3:"Almost! Try again.",2:"Oops! Listen again.",1:"I can't hear you. Say it louder."};
+function scoreSpeech(w,a,hd){ // a: phân tích âm thanh (có thể null), hd: kết quả nhận dạng
+  const loud=a?a.peak>=.05&&a.voiced>=.15:null,silent=a?a.peak<.008||a.voiced<.12:null;
+  const sylOK=a?Math.abs(a.syl-syllables(spoken(w)))<=1:null;
+  if(hd.used){
+    if(hd.tops.length){const top=heardMatch(w,hd.tops);
+      if(top){const c=hd.conf||0;const clear=c>=.7||(c===0&&(loud===null||(loud&&sylOK)));
+        return{stars:clear?5:4,heard:top};}
+      const alt=heardMatch(w,hd.alts)||heardPart(w,hd.tops.concat(hd.alts));
+      if(alt)return{stars:3,heard:alt};
+      return{stars:2,heard:hd.tops[0]};}
+    if(silent===true)return{stars:1};
+    return loud===false?{stars:1}:{stars:2,msg:"Cô chưa nghe rõ con nói từ gì. Con nói to, rõ lại nhé!"};} // có tiếng nhưng máy không ra chữ
+  // máy không nhận dạng được chữ: chỉ chấm được độ to, nhịp → tối đa 3 sao, bố mẹ chấm lại
+  if(!a||silent)return{stars:1};
+  return{stars:loud&&sylOK?3:2,check:true,msg:loud?"Con đã nói to rồi! Bố mẹ nghe lại và chấm giúp con nhé.":"Con đã nói, nhưng hơi nhỏ. Bố mẹ nghe lại và chấm giúp con nhé."};}
 
 function speakStep(){const ws=R.l.words;let k=0;
-  function one(){const w=ws[k];const fb=h("p",{class:"fb"});const res=h("div",{class:"vres",hidden:true});const id="rec-"+R.l.id+"-"+k;let wrongN=0;
+  if(!DICT&&MIC.state==="unknown")getMic(); // xin quyền micro ngay khi vào bước nói, để lần chạm đầu tiên ghi âm được luôn
+  function one(){const w=ws[k];const fb=h("p",{class:"fb"});const res=h("div",{class:"vres",hidden:true});const id="rec-"+R.l.id+"-"+k;let tries=0;
     const go=()=>{const my=SEQ;(async()=>{await wait(400);if(my!==SEQ)return;k++;k<ws.length?one():next();})();};
-    const skip=h("button",{class:"btn ghost",disabled:true,onclick:()=>{hush();saveSpeak(w,null,"skip");go();}},"Bỏ qua từ này →");
-    /* cách dự phòng khi micro bị chặn: trình ghi âm của máy */
-    const fileIn=h("input",{type:"file",accept:"audio/*",capture:"",id,class:"vh"});
+    const skip=h("button",{class:"btn ghost",disabled:true,onclick:()=>{hush();stopAll(true);saveSpeak(w,null,"skip");go();}},"Bỏ qua từ này →");
+    const fileIn=h("input",{type:"file",accept:"audio/*",id,class:"vh"});
     const fileBtn=h("label",{class:"btn speak rec",for:id,role:"button","aria-label":"Ghi âm giọng con",hidden:true},imgFix("🎤",56),"Ghi âm");
-    const fileTip=h("p",{class:"small muted center",hidden:true},"Trang này không được mở micro trực tiếp, nên dùng trình ghi âm của máy và bố mẹ chấm giúp. Trên trang web riêng hoặc app thật, bé chỉ cần giữ nút để nói.");
-    fileIn.onchange=async()=>{const f=fileIn.files&&fileIn.files[0];if(!f)return;await judge(f,{used:false},9999);};
-    /* cách chính: giữ để nói */
-    const lab=h("span",{},"Giữ để nói");
-    const holdBtn=h("button",{class:"btn speak rec hold","aria-label":"Giữ nút để nói theo cô, nhả ra khi nói xong"},imgFix("🎤",56),lab);
-    let down=false,busy=false,mr=null,chunks=[],sr=null,heard=null,t0=0,raf=0,an=null,src=null;
+    const fileTip=h("p",{class:"small muted center",hidden:true},"Máy này chưa cho trang mở micro. Bấm Ghi âm để dùng trình ghi âm của máy, bố mẹ chấm giúp. Muốn máy tự chấm: mở trang web riêng của app bằng Chrome (Android) hoặc Safari (iPhone).");
+    fileIn.onchange=async()=>{const f=fileIn.files&&fileIn.files[0];if(!f)return;let a=null;try{a=await analyzeVoice(f);}catch(e){}
+      show(scoreSpeech(w,a,{used:false,tops:[],alts:[]}),URL.createObjectURL(f));};
+    const lab=h("span",{},"Bấm hoặc giữ để nói");
+    const holdBtn=h("button",{class:"btn speak rec hold","aria-label":"Bấm hoặc giữ nút để nói theo cô"},imgFix("🎤",56),lab);
+    let down=false,busy=false,rec=false,toggle=false,pendStop=false,mr=null,chunks=[],sr=null,heard=null,t0=0,raf=0,an=null,src=null,timer=0,vad={voice:0,quiet:0},dictText="",dictUn=[];
     const useFile=()=>{holdBtn.hidden=true;fileBtn.hidden=false;fileTip.hidden=false;};
-    if(MIC.state==="blocked")useFile();
-    async function start(){if(busy)return;hush();res.hidden=true;fb.textContent="";
-      const st=await getMic();if(!st){useFile();fb.textContent="Micro chưa mở được ở đây. Con bấm nút Ghi âm nhé.";fb.className="fb no";return;}
-      if(!down){fb.textContent="Micro đã sẵn sàng. Con giữ nút và nói nhé!";fb.className="fb ok";return;}
-      chunks=[];heard={used:false,tops:[],alts:[],err:null,got:false};try{mr=new MediaRecorder(st);}catch(e){useFile();return;}
-      mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};mr.start();t0=performance.now();
+    if(!DICT&&MIC.state==="blocked")useFile();
+    const setRec=on=>{rec=on;holdBtn.classList.toggle("on",on);lab.textContent=on?(toggle?"Đang nghe… chạm để dừng":"Đang nghe…"):"Bấm hoặc giữ để nói";};
+    function stopAll(silent){clearTimeout(timer);cancelAnimationFrame(raf);try{src&&src.disconnect();}catch(e){}
+      if(silent){try{mr&&(mr.onstop=null,mr.state==="recording"&&mr.stop());}catch(e){}try{sr&&sr.abort();}catch(e){}if(DICT&&dictUn.length){dictUn.forEach(u=>u());dictUn=[];DICT.stop().catch(()=>{});}setRec(false);}}
+    /* --- đường 2: dictation của Claude --- */
+    function startDict(){hush();res.hidden=true;fb.textContent="";dictText="";toggle=false;
+      dictUn.forEach(u=>u());dictUn=[DICT.onFinal(e=>{dictText+=e.text;bump();}),DICT.onPartial(e=>{if(e.text)bump();})];
+      t0=performance.now();lab.textContent="Đang mở micro…";
+      pendStop=false;DICT.start({language:"en"}).then(()=>{setRec(true);timer=setTimeout(()=>finish(),7000);if(pendStop)setTimeout(()=>finish(),600);}).catch(e=>{dictUn.forEach(u=>u());dictUn=[];setRec(false);
+        if(e&&e.code==="not_granted"||e&&e.code==="unavailable"){DICT=null;MIC.state="unknown";getMic().then(s=>{if(!s)useFile();});fb.textContent="Micro của Claude chưa được bật. Con thử lại nhé.";}
+        else if(e&&e.code!=="stopped")fb.textContent="Micro chưa mở được. Con bấm lại nhé.";fb.className="fb no";});}
+    let quietT=0;function bump(){clearTimeout(quietT);if(toggle)quietT=setTimeout(()=>finish(),1400);}
+    /* --- đường 1: micro trực tiếp --- */
+    async function startMic(){hush();res.hidden=true;fb.textContent="";toggle=false;
+      const st=await getMic();if(!st){useFile();fb.textContent="Micro chưa mở được ở đây.";fb.className="fb no";return;}
+      if(!down){fb.textContent="Micro đã sẵn sàng. Con bấm nút micro rồi nói nhé!";fb.className="fb ok";return;}
+      try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.resume)actx.resume();}catch(e){}
+      chunks=[];heard={used:false,tops:[],alts:[],conf:0,err:null,got:false};try{mr=new MediaRecorder(st);}catch(e){useFile();return;}
+      mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};mr.start();t0=performance.now();vad={voice:0,quiet:0};
       const SRc=window.SpeechRecognition||window.webkitSpeechRecognition;
       if(SRc&&SR_STATE!=="off"){try{sr=new SRc();sr.lang="en-US";sr.maxAlternatives=5;sr.interimResults=false;sr.continuous=false;heard.used=true;
-        sr.onresult=ev=>{heard.got=true;for(const r of ev.results){if(r[0])heard.tops.push(r[0].transcript);for(const a of r)heard.alts.push(a.transcript);}};
-        sr.onerror=ev=>{heard.err=ev.error;};sr.start();}catch(e){sr=null;heard.used=false;}}
-      try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();an=actx.createAnalyser();an.fftSize=512;src=actx.createMediaStreamSource(st);src.connect(an);
-        const buf=new Uint8Array(an.fftSize);const tickM=()=>{an.getByteTimeDomainData(buf);let s=0;for(const v of buf){const x=(v-128)/128;s+=x*x;}
-          holdBtn.style.setProperty("--lv",Math.min(1,Math.sqrt(s/buf.length)*6).toFixed(2));raf=requestAnimationFrame(tickM);};tickM();}catch(e){}
-      holdBtn.classList.add("on");lab.textContent="Đang nghe…";}
-    function stop(){if(!mr||mr.state!=="recording")return;const dur=performance.now()-t0;cancelAnimationFrame(raf);try{src&&src.disconnect();}catch(e){}
-      holdBtn.classList.remove("on");lab.textContent="Giữ để nói";
-      if(dur<350){try{mr.onstop=null;mr.stop();}catch(e){}try{sr&&sr.abort();}catch(e){}
-        fb.textContent="Con giữ nút trong lúc nói, nói xong mới nhả ra nhé!";fb.className="fb no";return;}
-      busy=true;const srDone=sr?new Promise(r=>{sr.onend=r;setTimeout(r,1800);}):Promise.resolve();
-      mr.onstop=async()=>{const blob=new Blob(chunks,{type:mr.mimeType||"audio/webm"});try{sr&&sr.stop();}catch(e){}
-        await srDone;
-        if(heard.used&&!heard.got&&["audio-capture","not-allowed","service-not-allowed","network"].includes(heard.err))heard.used=false; // máy không nhận dạng được
-        await judge(blob,heard,dur);busy=false;};
+        sr.onresult=ev=>{heard.got=true;for(const r of ev.results){if(r[0]){heard.tops.push(r[0].transcript);heard.conf=Math.max(heard.conf,r[0].confidence||0);}for(const a of r)heard.alts.push(a.transcript);}};
+        sr.onerror=ev=>{heard.err=ev.error;};sr.start();}catch(e){sr=null;heard.used=false;}}else sr=null;
+      try{an=actx.createAnalyser();an.fftSize=512;src=actx.createMediaStreamSource(st);src.connect(an);
+        const buf=new Uint8Array(an.fftSize);let last=performance.now();
+        const tickM=()=>{an.getByteTimeDomainData(buf);let s=0;for(const v of buf){const x=(v-128)/128;s+=x*x;}const lv=Math.sqrt(s/buf.length);
+          holdBtn.style.setProperty("--lv",Math.min(1,lv*6).toFixed(2));const now=performance.now(),dt=now-last;last=now;
+          if(lv>.03){vad.voice+=dt;vad.quiet=0;}else vad.quiet+=dt;
+          if(toggle&&vad.voice>250&&vad.quiet>1100){finish();return;} // chế độ bấm một lần: con nói xong, im 1 giây là tự dừng
+          raf=requestAnimationFrame(tickM);};tickM();}catch(e){}
+      setRec(true);timer=setTimeout(()=>finish(),7000);}
+    function finish(){if(!rec||busy)return;clearTimeout(timer);clearTimeout(quietT);cancelAnimationFrame(raf);try{src&&src.disconnect();}catch(e){}setRec(false);busy=true;lab.textContent="Cô đang nghe…";
+      if(DICT&&dictUn.length){DICT.stop().catch(()=>{}).then(()=>{dictUn.forEach(u=>u());dictUn=[];busy=false;const t=dictText.trim();
+          show(scoreSpeech(w,null,{used:true,tops:t?[t]:[],alts:[],conf:0}),null);});return;}
+      const srDone=sr?new Promise(r=>{sr.onend=r;setTimeout(r,2000);}):Promise.resolve();
+      mr.onstop=async()=>{const blob=new Blob(chunks,{type:mr.mimeType||"audio/webm"});try{sr&&sr.stop();}catch(e){}await srDone;
+        if(heard.used&&!heard.got&&["audio-capture","not-allowed","service-not-allowed","network","language-not-supported"].includes(heard.err)){heard.used=false;if(heard.err!=="network")SR_STATE="off";}
+        let a=null;try{a=await analyzeVoice(blob);}catch(e){}
+        busy=false;lab.textContent="Bấm hoặc giữ để nói";show(scoreSpeech(w,a,heard),URL.createObjectURL(blob));};
       try{mr.stop();}catch(e){busy=false;}}
-    holdBtn.addEventListener("pointerdown",e=>{e.preventDefault();down=true;try{holdBtn.setPointerCapture(e.pointerId);}catch(_){}start();});
-    ["pointerup","pointercancel"].forEach(ev=>holdBtn.addEventListener(ev,()=>{if(!down)return;down=false;stop();}));
+    /* Thao tác: GIỮ rồi NHẢ = trả lời; hoặc CHẠM NHANH một lần = bắt đầu nghe, con nói xong tự dừng (hoặc chạm lần nữa) */
+    function press(){if(busy)return;
+      if(rec){if(toggle)finish();return;}
+      if(DICT)startDict();else startMic();}
+    function release(){if(!rec&&!(DICT&&dictUn.length))return;const dur=performance.now()-t0;
+      if(dur<450){toggle=true;if(rec)lab.textContent="Đang nghe… chạm để dừng";fb.textContent="Cô đang nghe, con nói đi!";fb.className="fb ok";return;}
+      if(toggle)return;if(rec)finish();else pendStop=true;}
+    holdBtn.addEventListener("pointerdown",e=>{e.preventDefault();if(down)return;down=true;try{holdBtn.setPointerCapture(e.pointerId);}catch(_){}press();});
+    holdBtn.addEventListener("pointerup",()=>{if(!down)return;down=false;release();});
+    holdBtn.addEventListener("pointercancel",()=>{if(!down)return;down=false;release();});
     holdBtn.addEventListener("contextmenu",e=>e.preventDefault());
-    holdBtn.addEventListener("keydown",e=>{if((e.key===" "||e.key==="Enter")&&!down&&!e.repeat){e.preventDefault();down=true;start();}});
-    holdBtn.addEventListener("keyup",e=>{if((e.key===" "||e.key==="Enter")&&down){down=false;stop();}});
+    holdBtn.addEventListener("keydown",e=>{if((e.key===" "||e.key==="Enter")&&!down&&!e.repeat){e.preventDefault();down=true;press();}});
+    holdBtn.addEventListener("keyup",e=>{if((e.key===" "||e.key==="Enter")&&down){down=false;release();}});
 
-    /* CHẤM: 3 sao CHỈ khi máy nghe đúng từ. Sai → báo ngay, cô đọc lại mẫu, bé đọc lại. */
-    async function judge(blob,hd,dur){fb.textContent="Cô đang nghe con nói…";fb.className="fb";
-      let a;try{a=await analyzeVoice(blob);}catch(err){fb.textContent="Máy chưa đọc được tiếng. Con thử lại nhé.";fb.className="fb no";return;}
-      fb.textContent="";const g0=gradeVoice(a,syllables(spoken(w)));let r;
-      if(g0.lv===0)r={kind:"wrong",lv:0,msg:"Cô chưa nghe thấy con nói. Con giữ nút và nói to hơn nhé!"};
-      else if(!hd.used)r={kind:"check",lv:1,msg:"Con đã nói rồi! Máy này chưa kiểm tra được đúng hay sai, bố mẹ nghe lại và chấm giúp nhé."};
-      else if(!hd.tops.length)r={kind:"wrong",lv:0,msg:"Cô chưa nghe rõ từ con nói. Con nghe cô rồi nói to, rõ lại nhé!"};
-      else{const top=heardMatch(w,hd.tops),alt=top?null:heardMatch(w,hd.alts);
-        if(top)r={kind:"ok",lv:3,msg:`Đúng rồi! Cô nghe con nói "${top}". Giỏi lắm!`};
-        else if(alt)r={kind:"near",lv:2,msg:"Gần đúng rồi! Con nghe cô và đọc lại rõ hơn nhé."};
-        else r={kind:"wrong",lv:0,msg:`Chưa đúng. Cô nghe con nói "${hd.tops[0]}". Con nghe cô đọc rồi đọc lại nhé!`};}
-      if(r.kind==="wrong"||r.kind==="near")wrongN++;
-      saveSpeak(w,r.lv,r.kind==="ok"?"auto-ok":r.kind==="check"?null:"auto-wrong");show(r,URL.createObjectURL(blob));}
-    function show(r,url){res.hidden=false;res.className="vres "+r.kind;const au=h("audio",{src:url,preload:"auto"});
-      const playMe=h("button",{class:"btn alt",onclick:()=>{hush();try{au.currentTime=0;au.play();}catch(e){}}},"▶ Nghe con nói");
-      const again=()=>{res.hidden=true;fb.textContent="Con nghe cô rồi giữ nút đọc lại nhé!";fb.className="fb";say(spoken(w),true);};
-      const kids=[h("p",{class:"stars vstars","aria-label":`${r.lv} trên 3 sao`},starStr(r.lv)),h("p",{class:"vmsg"},r.msg)];
-      if(r.kind==="ok"){kids.push(h("div",{class:"row"},playMe,h("button",{class:"btn",onclick:()=>{beep(true);go();}},"Tiếp tục →")));}
-      else if(r.kind==="check"){kids.push(h("div",{class:"row"},playMe,h("button",{class:"btn alt",onclick:()=>{try{au.pause();}catch(e){}say(spoken(w),true);}},"Nghe cô")),
-          h("p",{class:"small muted"},"Bố mẹ hoặc cô giáo chấm:"),
-          h("div",{class:"rate two"},h("button",{class:"btn ok",onclick:()=>{saveSpeak(w,null,"ok");beep(true);go();}},"Đúng"),
-            h("button",{class:"btn again",onclick:()=>{saveSpeak(w,null,"again");wrongN++;again();}},"Sai, đọc lại")));}
+    function show(r,url){tries++;res.hidden=false;const s=r.stars;res.className="vres "+(s>=4?"ok":s===3?"near":"wrong");
+      saveSpeak(w,s,r.check?null:undefined);
+      const au=url?h("audio",{src:url,preload:"auto"}):null;
+      const playMe=au?h("button",{class:"btn alt",onclick:()=>{hush();try{au.currentTime=0;au.play();}catch(e){}}},"▶ Nghe con nói"):null;
+      const again=()=>{res.hidden=true;fb.textContent="Con nghe cô rồi bấm micro đọc lại nhé!";fb.className="fb";say(spoken(w),true);};
+      const kids=[h("p",{class:"stars vstars","aria-label":`${s} trên 5 sao`},"★".repeat(s)+"☆".repeat(5-s)),
+        h("p",{class:"vmsg"},r.msg||STAR_MSG[s]),r.heard&&s<=3?h("p",{class:"small muted"},`Cô nghe con nói: "${r.heard}"`):null];
+      if(r.check){kids.push(h("p",{class:"small muted center"},"Sao ở trên là máy đo độ to và nhịp đọc (tối đa 3★). Máy này chưa nhận ra từ, bố mẹ chấm từ 1 đến 5 sao:"),
+          h("div",{class:"row"},playMe,h("button",{class:"btn alt",onclick:()=>say(spoken(w),true)},"Nghe cô")),
+          h("div",{class:"rate five"},[1,2,3,4,5].map(n=>h("button",{class:"btn "+(n>=4?"ok":n===3?"near":"again"),"aria-label":n+" sao",onclick:()=>{
+            const r2=S.speak[w.en];if(r2){r2.best=Math.max(r2.best,n);r2.last=n;r2.rate=n>=4?"ok":n===3?"near":"again";if(n<=2)r2.wrong=(r2.wrong||0)+1;save();}
+            n>=3?(beep(true),go()):again();}},n+"★"))));}
+      else if(s>=4)kids.push(h("div",{class:"row"},playMe,h("button",{class:"btn",onclick:()=>{beep(true);go();}},"Tiếp tục →")));
+      else if(s===3)kids.push(h("div",{class:"row"},h("button",{class:"btn again",onclick:again},"🔁 Đọc lại"),h("button",{class:"btn alt",onclick:()=>{beep(true);go();}},"Tiếp tục →")),playMe);
       else{kids.push(h("div",{class:"row"},playMe,h("button",{class:"btn again",onclick:again},"🔁 Đọc lại")));
-        if(wrongN>=3)kids.push(h("p",{class:"small muted center"},"Từ này hơi khó. Mình luyện lại sau, con có thể bỏ qua từ này."));}
-      kids.push(au);res.replaceChildren(...kids);
-      const my=SEQ;(async()=>{if(r.kind==="ok"){await say("Excellent!");}else if(r.kind==="check"){await say("Good job!");}
-        else{await say(r.kind==="near"?"Almost! Listen again.":"Oops! Listen again.");if(my!==SEQ)return;await wait(300);if(my===SEQ&&!res.hidden)await say(spoken(w),true);}})();
-      skip.className=wrongN>=3?"btn alt":"btn ghost";}
+        if(tries>=3)kids.push(h("p",{class:"small muted center"},"Từ này hơi khó. Mình luyện lại sau, con có thể bỏ qua từ này."));}
+      if(au)kids.push(au);res.replaceChildren(...kids.filter(Boolean));
+      if(s>=4)beep(true);
+      const my=SEQ;(async()=>{await say(r.check?"Good job!":STAR_SAY[s]);if(s<=3&&!r.check){if(my!==SEQ)return;await wait(300);if(my===SEQ&&!res.hidden)await say(spoken(w),true);}})();
+      skip.className=s<=2&&tries>=3?"btn alt":"btn ghost";}
     frame(`Nói theo cô ${k+1}/${ws.length}`,pic(w,170),h("p",{class:"word"},w.en),
       h("div",{class:"row",style:"justify-content:center;align-items:center;gap:18px"},
         h("button",{class:"btn alt speak",onclick:()=>say(spoken(w),true)},imgFix("👩‍🏫",52),"Nghe cô"),holdBtn,fileBtn),fileIn,
-      h("p",{class:"small muted center"},"Giữ nút micro, nói to theo cô, nói xong thì nhả tay."),fileTip,
-      fb,res,skip,h("p",{class:"note center",style:"width:100%"},APP_VERSION));
-    const my=SEQ;(async()=>{await wait(600);if(my!==SEQ)return;if(k===0){await hint("Con nghe cô đọc, rồi giữ nút micro và nói to theo nhé.");if(my!==SEQ)return;await wait(400);}
+      h("p",{class:"small muted center"},"Chạm nút micro rồi nói (nói xong tự dừng), hoặc giữ nút trong lúc nói rồi nhả ra."),fileTip,
+      fb,res,skip,h("p",{class:"note center",style:"width:100%"},APP_VERSION+" · "+micMode()));
+    const my=SEQ;(async()=>{await wait(600);if(my!==SEQ)return;if(k===0){await hint("Con nghe cô đọc, rồi bấm nút micro và nói to theo nhé.");if(my!==SEQ)return;await wait(400);}
       await say(spoken(w),true);if(my!==SEQ)return;await wait(800);if(my===SEQ)skip.disabled=false;})();}
   one();}
-
+const micMode=()=>DICT?"micro qua Claude":MIC.state==="blocked"?"ghi âm bằng máy":(window.SpeechRecognition||window.webkitSpeechRecognition)?"micro trực tiếp + chấm tự động":"micro trực tiếp, bố mẹ chấm";
 function memoryStep(){const pairs=pick(R.l.words,Math.min(4,R.l.words.length));
   const cards=shuffle([...pairs,...pairs]);let open=[],got=0,lock=false,moves=0;
   const cols=cards.length<=6?3:4;
@@ -549,7 +594,7 @@ function reward(){inLesson=false;const acc=R.total?R.right/R.total:1;const stars
 /* ---- Khu phụ huynh ---- */
 function speakLevel(){const v=Object.values(S.speak||{}).filter(r=>r.tries>0);
   if(v.length<5)return{n:v.length,label:"Chưa đủ dữ liệu",note:`Cần ghi âm ít nhất 5 từ (hiện có ${v.length}).`};
-  const auto=v.reduce((a,r)=>a+r.best,0)/v.length/3;const rated=v.filter(r=>r.rate);const ok=rated.length?rated.reduce((a,r)=>a+(r.rate==="ok"?1:r.rate==="near"?.5:0),0)/rated.length:null;
+  const auto=v.reduce((a,r)=>a+(r.scale===5?r.best:r.best*5/3),0)/v.length/5;const rated=v.filter(r=>r.rate);const ok=rated.length?rated.reduce((a,r)=>a+(r.rate==="ok"?1:r.rate==="near"?.5:0),0)/rated.length:null;
   const sc=ok==null?auto:(auto*.5+ok*.5);const label=sc>=.75?"Tự tin":sc>=.45?"Đang tiến bộ":"Mới bắt đầu";
   return{n:v.length,label,auto,ok,rated:rated.length,note:ok==null?"Chưa có lượt chấm của bố mẹ/cô giáo; cấp độ đang dựa vào máy chấm.":""};}
 function speakCard(){const L=speakLevel();const W=Object.fromEntries(LES.flatMap(l=>l.words).map(w=>[w.en,w]));
@@ -558,11 +603,11 @@ function speakCard(){const L=speakLevel();const W=Object.fromEntries(LES.flatMap
     h("div",{class:"stats"},
       h("div",{class:"stat"},h("span",{class:"small muted"},"Cấp độ nói"),h("b",{style:"font-size:1.25rem"},L.label)),
       h("div",{class:"stat"},h("span",{class:"small muted"},"Số từ đã ghi âm"),h("b",{},String(L.n))),
-      h("div",{class:"stat"},h("span",{class:"small muted"},"Máy chấm trung bình"),h("b",{},L.auto!=null?`${(L.auto*3).toFixed(1)}/3 ★`:"–")),
+      h("div",{class:"stat"},h("span",{class:"small muted"},"Máy chấm trung bình"),h("b",{},L.auto!=null?`${(L.auto*5).toFixed(1)}/5 ★`:"–")),
       h("div",{class:"stat"},h("span",{class:"small muted"},"Bố mẹ/cô chấm Đúng"),h("b",{},L.ok!=null?`${Math.round(L.ok*100)}%`:"–"))),
     L.note?h("p",{class:"muted small"},L.note):null,
     need.length?h("p",{class:"small"},h("b",{},"Từ cần luyện nói thêm: "),need.map(([e])=>e+(W[e]?` (${W[e].vi})`:"")).join(", ")):null,
-    h("p",{class:"muted small"},"3 sao chỉ khi máy nghe đúng từ bé nói. Đọc sai, máy báo ngay và cho bé đọc lại. Máy không có chức năng nhận dạng giọng nói thì bố mẹ chấm giúp. Bản app thật sẽ dùng công nghệ chấm phát âm chuyên dụng."));}
+    h("p",{class:"muted small"},"Thang 5 sao: 5★ đúng và rõ, 4★ đúng, 3★ gần đúng (nên đọc lại), 2★ sai từ, 1★ chưa nghe thấy. Từ 2★ trở xuống bé phải đọc lại. Máy không nhận dạng được giọng nói thì bố mẹ chấm. Bản app thật sẽ dùng công nghệ chấm phát âm chuyên dụng."));}
 function parent(){inLesson=false;stopClock();hush();loadVoices();
   const reg=LES.filter(l=>!l.review),doneL=reg.filter(l=>S.done[l.id]),acc=S.total?Math.round(S.right/S.total*100):0;
   const words=doneL.reduce((a,l)=>a+l.words.length,0),allW=reg.reduce((a,l)=>a+l.words.length,0);
