@@ -1,8 +1,18 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="App học tiếng Anh miễn phí cho trẻ 4–6 tuổi: nghe, chọn hình, nói theo cô giáo. Không quảng cáo, không thu thập dữ liệu.">
+<meta name="theme-color" content="#2F6FDE">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ngôi Sao Nhỏ">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>window.NSN_PWA=true;</script>
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
 <title>Ngôi Sao Nhỏ English</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
 /* Layout: app một cột kiểu điện thoại; trang chủ là lưới thẻ chủ đề có hình 3D, bài học là một thẻ lớn ở giữa, nút to cho ngón tay trẻ 4–6 tuổi */
 :root{
@@ -141,8 +151,8 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu
 .bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;min-width:60px}
 .bar i{display:block;height:100%;background:var(--ok)}
 label{font-weight:700}
-input[type=text],input[type=number],select{font:inherit;font-size:1.05rem;padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink);width:100%}
-.avs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+input[type=text],input[type=number],select{font:inherit;font-size:1.05rem;padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink);width:100%;box-sizing:border-box;max-width:100%}
+.avs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.avs .av{min-width:0;padding:4px}.avs .av img{width:100%;height:auto;max-width:48px}
 .av{appearance:none;aspect-ratio:1;max-width:100%;border-radius:16px;border:3px solid var(--line);background:var(--soft);cursor:pointer;padding:6px}
 .av img{width:100%;height:100%}
 .av.sel{border-color:var(--primary)}
@@ -150,6 +160,7 @@ input[type=text],input[type=number],select{font:inherit;font-size:1.05rem;paddin
 .overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 94%,transparent);display:grid;place-items:center;z-index:20;
   padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .overlay[hidden],[hidden]{display:none!important}
+.consent{background:var(--soft);border-radius:14px;padding:12px;font-size:.92rem;line-height:1.4}.consent label,.consent span{font-weight:500}.consent b{font-weight:800}.consent input{width:22px;height:22px;flex:0 0 22px;margin-top:2px}
 .soundtip{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:3px solid var(--sun);display:flex;flex-direction:column;gap:10px;
   padding:14px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));box-shadow:0 -6px 20px rgba(0,0,0,.15)}
 .soundtip p{margin:0;font-size:.95rem}
@@ -171,12 +182,13 @@ const LES=[];TOPICS.forEach((t,ti)=>{t.idx=ti;t.lessons=[];
   const r={id:`${t.k}-r`,t,title:"Review",review:true,words:t.lessons.flatMap(l=>l.words)};t.lessons.push(r);LES.push(r);});
 const BYID=Object.fromEntries(LES.map(l=>[l.id,l]));
 const ICON={people:"EK_FAM_FAMILY",colors:"EK_COL_PURPLE",numbers:"EK_DIG_03_THREE",abc:"EK_ABC_A_APPLE",places:"EK_PLA_SCHOOL",home:"EK_HOM_BED"};
-const APP_VERSION="Phiên bản 11 · 12/11/2026";
+const APP_VERSION="Phiên bản 1.0 · 13/11/2026";
+const POLICY=window.NSN_PWA?"chinh-sach-bao-mat.html":"https://datdong1805-vn.github.io/ngoi-sao-nho-demo/chinh-sach-bao-mat.html";
 const AVATARS=["🐅","🐼","🦊","🐇","🦁","🐒"];
 
 /* ---- Tiến độ lưu trên máy ---- */
 const KEY="nsn-l1-v2";let mem=null;
-const blank=()=>({kid:null,ava:"🐼",done:{},wrong:{},right:0,total:0,limit:20,unlockAll:false,day:"",secs:0,voice:"",viHint:true,speak:{}});
+const blank=()=>({kid:null,ava:"🐼",done:{},wrong:{},right:0,total:0,limit:20,unlockAll:false,day:"",secs:0,voice:"",viHint:true,speak:{},srConsent:false});
 function load(){try{const s=localStorage.getItem(KEY);if(s)return Object.assign(blank(),JSON.parse(s));}catch(e){}return mem||blank();}
 function save(){mem=S;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 let S=load();const today=()=>new Date().toISOString().slice(0,10);
@@ -296,9 +308,13 @@ function onboard(){inLesson=false;let ava=S.ava;
     h("div",{class:"center",style:"display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:8px"},h("div",{class:"teacher"},img("👩‍🏫",120)),h("h1",{},"Ngôi Sao Nhỏ English"),h("p",{class:"muted"},"Nghe, nhìn hình và nói theo cô giáo. Mỗi ngày 15–20 phút.")),
     h("section",{class:"card"},h("label",{for:"kid-name"},"Bố mẹ đặt tên gọi cho bé"),name,
       h("p",{class:"muted small"},"Chỉ cần tên gọi ở nhà, không cần họ tên thật, không cần ảnh."),
-      h("label",{},"Bé chọn bạn đồng hành"),avs,
+      h("label",{},"Bé chọn bạn đồng hành"),avs,consentBox(),
       h("button",{class:"btn",onclick:()=>{S.kid=(name.value.trim()||"Bé").slice(0,16);S.ava=ava;save();say("Hello! Let's learn English!");home();}},"Bắt đầu")),
-    h("p",{class:"note"},"Không quảng cáo, không nhắn tin, không trò chuyện với người lạ. Tiến độ chỉ lưu trên thiết bị này."));}
+    h("p",{class:"note"},"Không quảng cáo, không nhắn tin, không trò chuyện với người lạ. Tiến độ chỉ lưu trên thiết bị này. ",h("a",{href:POLICY,target:"_blank",rel:"noopener"},"Chính sách bảo mật")));}
+/* Đồng ý của phụ huynh cho chấm phát âm tự động (giọng bé được gửi tới dịch vụ nhận dạng giọng nói của Google/Apple) */
+function consentBox(){const c=h("input",{type:"checkbox",id:"sr-consent",checked:!!S.srConsent});c.onchange=()=>{S.srConsent=c.checked;save();};
+  return h("div",{class:"consent"},h("label",{for:"sr-consent",style:"display:flex;gap:10px;align-items:flex-start"},c,h("span",{},h("b",{},"Bố mẹ đồng ý cho máy tự chấm phát âm. "),
+    "Khi bé nói theo cô, giọng bé được gửi tới dịch vụ nhận dạng giọng nói của Google (Android, Chrome) hoặc Apple (iPhone) để chuyển thành chữ và chấm sao. App không lưu và không gửi giọng bé đi nơi nào khác. Không đồng ý: bé vẫn ghi âm, bố mẹ nghe lại và chấm.")));}
 
 /* ---- Trang chủ ---- */
 function home(){inLesson=false;stopClock();hush();releaseMic();if(!S.kid)return onboard();
@@ -471,6 +487,7 @@ function scoreSpeech(w,a,hd){ // a: phân tích âm thanh (có thể null), hd: 
   return{stars:loud&&sylOK?3:2,check:true,msg:loud?"Con đã nói to rồi! Bố mẹ nghe lại và chấm giúp con nhé.":"Con đã nói, nhưng hơi nhỏ. Bố mẹ nghe lại và chấm giúp con nhé."};}
 
 function speakStep(){const ws=R.l.words;let k=0;
+  if(!S.srConsent)DICT=null; // chưa có đồng ý của phụ huynh: không gửi giọng bé đi đâu
   if(!DICT&&MIC.state==="unknown")getMic(); // xin quyền micro ngay khi vào bước nói, để lần chạm đầu tiên ghi âm được luôn
   function one(){const w=ws[k];const fb=h("p",{class:"fb"});const res=h("div",{class:"vres",hidden:true});const id="rec-"+R.l.id+"-"+k;let tries=0;
     const go=()=>{const my=SEQ;(async()=>{await wait(400);if(my!==SEQ)return;k++;k<ws.length?one():next();})();};
@@ -504,7 +521,7 @@ function speakStep(){const ws=R.l.words;let k=0;
       chunks=[];heard={used:false,tops:[],alts:[],conf:0,err:null,got:false};try{mr=new MediaRecorder(st);}catch(e){useFile();return;}
       mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};mr.start();t0=performance.now();vad={voice:0,quiet:0};
       const SRc=window.SpeechRecognition||window.webkitSpeechRecognition;
-      if(SRc&&SR_STATE!=="off"){try{sr=new SRc();sr.lang="en-US";sr.maxAlternatives=5;sr.interimResults=false;sr.continuous=false;heard.used=true;
+      if(SRc&&SR_STATE!=="off"&&S.srConsent){try{sr=new SRc();sr.lang="en-US";sr.maxAlternatives=5;sr.interimResults=false;sr.continuous=false;heard.used=true;
         sr.onresult=ev=>{heard.got=true;for(const r of ev.results){if(r[0]){heard.tops.push(r[0].transcript);heard.conf=Math.max(heard.conf,r[0].confidence||0);}for(const a of r)heard.alts.push(a.transcript);}};
         sr.onerror=ev=>{heard.err=ev.error;};sr.start();}catch(e){sr=null;heard.used=false;}}else sr=null;
       try{an=actx.createAnalyser();an.fftSize=512;src=actx.createMediaStreamSource(st);src.connect(an);
@@ -545,7 +562,7 @@ function speakStep(){const ws=R.l.words;let k=0;
       const again=()=>{res.hidden=true;fb.textContent="Con nghe cô rồi bấm micro đọc lại nhé!";fb.className="fb";say(spoken(w),true);};
       const kids=[h("p",{class:"stars vstars","aria-label":`${s} trên 5 sao`},"★".repeat(s)+"☆".repeat(5-s)),
         h("p",{class:"vmsg"},r.msg||STAR_MSG[s]),r.heard&&s<=3?h("p",{class:"small muted"},`Cô nghe con nói: "${r.heard}"`):null];
-      if(r.check){kids.push(h("p",{class:"small muted center"},"Sao ở trên là máy đo độ to và nhịp đọc (tối đa 3★). Máy này chưa nhận ra từ, bố mẹ chấm từ 1 đến 5 sao:"),
+      if(r.check){kids.push(h("p",{class:"small muted center"},S.srConsent?"Sao ở trên là máy đo độ to và nhịp đọc (tối đa 3★). Máy này chưa nhận ra từ, bố mẹ chấm từ 1 đến 5 sao:":"Sao ở trên là máy đo độ to và nhịp đọc (tối đa 3★). Bố mẹ nghe lại và chấm từ 1 đến 5 sao. Muốn máy tự chấm: bật trong mục Phụ huynh."),
           h("div",{class:"row"},playMe,h("button",{class:"btn alt",onclick:()=>say(spoken(w),true)},"Nghe cô")),
           h("div",{class:"rate five"},[1,2,3,4,5].map(n=>h("button",{class:"btn "+(n>=4?"ok":n===3?"near":"again"),"aria-label":n+" sao",onclick:()=>{
             const r2=S.speak[w.en];if(r2){r2.best=Math.max(r2.best,n);r2.last=n;r2.rate=n>=4?"ok":n===3?"near":"again";if(n<=2)r2.wrong=(r2.wrong||0)+1;save();}
@@ -566,7 +583,7 @@ function speakStep(){const ws=R.l.words;let k=0;
     const my=SEQ;(async()=>{await wait(600);if(my!==SEQ)return;if(k===0){await hint("Con nghe cô đọc, rồi bấm nút micro và nói to theo nhé.");if(my!==SEQ)return;await wait(400);}
       await say(spoken(w),true);if(my!==SEQ)return;await wait(800);if(my===SEQ)skip.disabled=false;})();}
   one();}
-const micMode=()=>DICT?"micro qua Claude":MIC.state==="blocked"?"ghi âm bằng máy":(window.SpeechRecognition||window.webkitSpeechRecognition)?"micro trực tiếp + chấm tự động":"micro trực tiếp, bố mẹ chấm";
+const micMode=()=>DICT?"micro qua Claude":MIC.state==="blocked"?"ghi âm bằng máy":!S.srConsent?"bố mẹ chấm (chưa bật chấm tự động)":(window.SpeechRecognition||window.webkitSpeechRecognition)?"micro trực tiếp + chấm tự động":"micro trực tiếp, bố mẹ chấm";
 function memoryStep(){const pairs=pick(R.l.words,Math.min(4,R.l.words.length));
   const cards=shuffle([...pairs,...pairs]);let open=[],got=0,lock=false,moves=0;
   const cols=cards.length<=6?3:4;
@@ -607,7 +624,7 @@ function speakCard(){const L=speakLevel();const W=Object.fromEntries(LES.flatMap
       h("div",{class:"stat"},h("span",{class:"small muted"},"Bố mẹ/cô chấm Đúng"),h("b",{},L.ok!=null?`${Math.round(L.ok*100)}%`:"–"))),
     L.note?h("p",{class:"muted small"},L.note):null,
     need.length?h("p",{class:"small"},h("b",{},"Từ cần luyện nói thêm: "),need.map(([e])=>e+(W[e]?` (${W[e].vi})`:"")).join(", ")):null,
-    h("p",{class:"muted small"},"Thang 5 sao: 5★ đúng và rõ, 4★ đúng, 3★ gần đúng (nên đọc lại), 2★ sai từ, 1★ chưa nghe thấy. Từ 2★ trở xuống bé phải đọc lại. Máy không nhận dạng được giọng nói thì bố mẹ chấm. Bản app thật sẽ dùng công nghệ chấm phát âm chuyên dụng."));}
+    h("p",{class:"muted small"},"Thang 5 sao: 5★ đúng và rõ, 4★ đúng, 3★ gần đúng (nên đọc lại), 2★ sai từ, 1★ chưa nghe thấy. Từ 2★ trở xuống bé phải đọc lại. Chưa bật chấm tự động, hoặc máy không nhận dạng được giọng nói, thì bố mẹ chấm. Máy nghe giọng trẻ nhỏ chưa thật chính xác, bố mẹ nên nghe lại khi bé bị chấm thấp."));}
 function parent(){inLesson=false;stopClock();hush();loadVoices();
   const reg=LES.filter(l=>!l.review),doneL=reg.filter(l=>S.done[l.id]),acc=S.total?Math.round(S.right/S.total*100):0;
   const words=doneL.reduce((a,l)=>a+l.words.length,0),allW=reg.reduce((a,l)=>a+l.words.length,0);
@@ -637,15 +654,29 @@ function parent(){inLesson=false;stopClock();hush();loadVoices();
       :h("p",{class:"muted"},"Chưa có từ nào bị nhầm."),h("p",{class:"muted small"},"Gợi ý: chỉ vào đồ vật thật trong nhà và cùng bé gọi tên bằng tiếng Anh.")),
     h("section",{class:"card"},h("h3",{},"Giọng cô giáo"),h("label",{for:"voice"},"Giọng đọc tiếng Anh trên thiết bị này"),vsel,
       h("button",{class:"btn alt",onclick:()=>say("Hello! I'm your teacher. Let's learn English together!")},"Nghe thử"),
-      h("p",{class:"muted small"},"App tự chọn giọng nữ tiếng Anh Mỹ nếu máy có. Bản phát hành sẽ dùng giọng cô giáo thu âm sẵn, đồng nhất trên mọi máy."),
+      h("p",{class:"muted small"},"App tự chọn giọng nữ tiếng Anh Mỹ có sẵn trên máy. Mỗi máy có giọng hơi khác nhau; bố mẹ chọn giọng nghe rõ nhất ở ô trên."),
       h("label",{style:"display:flex;gap:10px;align-items:center"},vh,"Đọc lời hướng dẫn bằng tiếng Việt"+(viVoice?"":" (máy chưa có giọng tiếng Việt)"))),
     h("section",{class:"card"},h("h3",{},"Cài đặt"),h("label",{for:"limit"},"Thời gian học tối đa"),lim,
       h("p",{class:"muted small"},"Mỗi bài khoảng 8–12 phút. Trẻ 4–6 tuổi nên học 15–20 phút mỗi ngày (1–2 bài), có người lớn ngồi cùng."),
-      h("label",{style:"display:flex;gap:10px;align-items:center"},un,"Mở khóa tất cả bài (chế độ giáo viên)"),rbox),
-    h("p",{class:"note"},"Hình học tập: bộ hình riêng của dự án (352 hình, 10 hạng mục), nén còn 480 px cho bản web. Biểu tượng phụ (cúp, ngôi sao, bạn đồng hành): Microsoft Fluent Emoji (MIT)."));
+      h("label",{style:"display:flex;gap:10px;align-items:center"},un,"Mở khóa tất cả bài (chế độ giáo viên)"),consentBox(),rbox),
+    installCard(),
+    h("p",{class:"note"},APP_VERSION+" · Hình học tập: bộ hình riêng của dự án (352 hình, 10 hạng mục). Biểu tượng phụ (cúp, ngôi sao, bạn đồng hành): Microsoft Fluent Emoji (MIT). ",h("a",{href:POLICY,target:"_blank",rel:"noopener"},"Chính sách bảo mật")));
   window.scrollTo(0,0);}
 
 document.addEventListener("visibilitychange",()=>{if(document.hidden)save();});
+/* ---- Cài lên điện thoại (chỉ trên trang web riêng của app) ---- */
+let INSTALL=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();INSTALL=e;});
+const standalone=()=>{try{return matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;}catch(e){return false;}};
+function installCard(){if(!window.NSN_PWA)return null;
+  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+  let body;
+  if(standalone())body=h("p",{class:"muted small"},"App đã được cài trên máy này. Bé mở bằng biểu tượng Ngôi Sao Nhỏ trên màn hình chính, dùng được cả khi không có mạng (trừ chấm phát âm tự động).");
+  else if(INSTALL)body=h("button",{class:"btn",onclick:async()=>{try{INSTALL.prompt();await INSTALL.userChoice;}catch(e){}INSTALL=null;parent();}},"📲 Cài app lên máy này");
+  else if(ios)body=h("p",{class:"small"},"Trên iPhone/iPad: mở trang này bằng Safari → bấm nút Chia sẻ (ô vuông có mũi tên lên) → chọn \"Thêm vào MH chính\" → Thêm.");
+  else body=h("p",{class:"small"},"Trên Android: mở trang này bằng Chrome → bấm dấu ⋮ góc trên → chọn \"Cài đặt ứng dụng\" hoặc \"Thêm vào màn hình chính\".");
+  return h("section",{class:"card"},h("h3",{},"Cài app lên điện thoại"),body,h("p",{class:"muted small"},"Sau khi cài, app mở toàn màn hình như ứng dụng thường, tự cập nhật khi có mạng."));}
+if(window.NSN_PWA&&"serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});}
 home();
 </script>
+
 </body></html>
